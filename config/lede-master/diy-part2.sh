@@ -1,53 +1,37 @@
 #!/bin/bash
-#========================================================================================================================
-# https://github.com/ophub/amlogic-s9xxx-openwrt
-# Description: Automatically Build OpenWrt for Amlogic s9xxx tv box
-# Function: Diy script (After Update feeds, Modify the default IP, hostname, theme, add/remove software packages, etc.)
-# Source code repository: https://github.com/coolsnowwolf/lede / Branch: master
-#========================================================================================================================
 
-# ------------------------------- Main source started -------------------------------
-#
-# Modify default theme（FROM uci-theme-bootstrap CHANGE TO luci-theme-material）
-# sed -i 's/luci-theme-bootstrap/luci-theme-material/g' ./feeds/luci/collections/luci/Makefile
+# 修改默认IP（可选，保持 192.168.1.1 即可）
+sed -i 's/192.168.1.1/192.168.1.1/g' package/base-files/files/bin/config_generate
 
-# Add autocore support for armvirt
-sed -i 's/TARGET_rockchip/TARGET_rockchip\|\|TARGET_armvirt/g' package/lean/autocore/Makefile
+# 版本号里显示编译时间
+sed -i "s/OpenWrt /OpenWrt Build $(TZ=UTC-8 date +%Y.%m.%d) /g" package/lean/default-settings/files/zzz-default-settings
 
-# Set etc/openwrt_release
-sed -i "s|DISTRIB_REVISION='.*'|DISTRIB_REVISION='R$(date +%Y.%m.%d)'|g" package/lean/default-settings/files/zzz-default-settings
-echo "DISTRIB_SOURCECODE='lede'" >>package/base-files/files/etc/openwrt_release
+# 添加 多WAN自动登录插件（Zesuy 核心）
+git clone https://github.com/Zesuy/luci-app-multi-login package/luci-app-multi-login
 
-# Modify default IP（FROM 192.168.1.1 CHANGE TO 192.168.31.4）
-# sed -i 's/192.168.1.1/192.168.31.4/g' package/base-files/files/bin/config_generate
+# 添加 校园网防检测（rkp-ipid）
+git clone https://github.com/pexcn/openwrt-rkp-ipid package/rkp-ipid
 
-# Replace the default software source
-# sed -i 's#openwrt.proxy.ustclug.org#mirrors.bfsu.edu.cn\\/openwrt#' package/lean/default-settings/files/zzz-default-settings
-#
-# ------------------------------- Main source ends -------------------------------
+# 添加 闭源WiFi驱动（CR6606 信号增强）
+git clone https://github.com/openwrt/mt76.git package/mt76
 
-# ------------------------------- Other started -------------------------------
-#
-# Add luci-app-amlogic
-svn co https://github.com/ophub/luci-app-amlogic/trunk/luci-app-amlogic package/luci-app-amlogic
+# 添加 主题 Argon 配置
+git clone https://github.com/jerrykuku/luci-app-argon-config package/luci-app-argon-config
 
-# Fix runc version error
-# rm -rf ./feeds/packages/utils/runc/Makefile
-# svn export https://github.com/openwrt/packages/trunk/utils/runc/Makefile ./feeds/packages/utils/runc/Makefile
+# 添加 AdGuard Home
+git clone https://github.com/rufengsuixing/luci-app-adguardhome package/luci-app-adguardhome
 
-# coolsnowwolf default software package replaced with Lienol related software package
-# rm -rf feeds/packages/utils/{containerd,libnetwork,runc,tini}
-# svn co https://github.com/Lienol/openwrt-packages/trunk/utils/{containerd,libnetwork,runc,tini} feeds/packages/utils
+# 添加 SmartDNS + DoH
+git clone https://github.com/pymumu/smartdns.git package/smartdns
+git clone https://github.com/pymumu/luci-app-smartdns.git package/luci-app-smartdns
 
-# Add third-party software packages (The entire repository)
-# git clone https://github.com/libremesh/lime-packages.git package/lime-packages
-# Add third-party software packages (Specify the package)
-# svn co https://github.com/libremesh/lime-packages/trunk/packages/{shared-state-pirania,pirania-app,pirania} package/lime-packages/packages
-# Add to compile options (Add related dependencies according to the requirements of the third-party software package Makefile)
-# sed -i "/DEFAULT_PACKAGES/ s/$/ pirania-app pirania ip6tables-mod-nat ipset shared-state-pirania uhttpd-mod-lua/" target/linux/armvirt/Makefile
+# 添加 常用工具
+git clone https://github.com/tty228/luci-app-wrtbwmon package/luci-app-wrtbwmon
 
-# Apply patch
-# git apply ../config/patches/{0001*,0002*}.patch --directory=feeds/luci
-#
-# ------------------------------- Other ends -------------------------------
+# 更新 feeds 并安装所有插件（必须）
+./scripts/feeds update -a
+./scripts/feeds install -a
 
+# 权限设置
+chmod -R 755 package/luci-app-multi-login
+chmod -R 755 package/rkp-ipid
