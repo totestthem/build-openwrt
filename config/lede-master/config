@@ -1,32 +1,41 @@
+# ======================== 目标平台配置 ========================
 CONFIG_TARGET_ramips=y
 CONFIG_TARGET_ramips_mt7621=y
 CONFIG_TARGET_ramips_mt7621_DEVICE_xiaomi_mi_router_cr6606=y
+
+# ======================== 文件系统配置 ========================
 CONFIG_TARGET_ROOTFS_SQUASHFS=y
 CONFIG_TARGET_ROOTFS_PARTSIZE=128
-CONFIG_BUILD_PATENTED=y
+CONFIG_TARGET_UBIFS_FREE_SPACE_FIXUP=y
+CONFIG_TARGET_OPTIMIZATION="-Os -pipe -mno-branch-likely -mips32r2 -mtune=24kc"
 
-# 基础系统 & 中文
+# ======================== 基础系统 & 中文本地化 ========================
+CONFIG_DEFAULT_luci=y
 CONFIG_DEFAULT_LUCI_LANGUAGE_zh_cn=y
 CONFIG_PACKAGE_luci=y
 CONFIG_PACKAGE_luci-base=y
 CONFIG_PACKAGE_luci-mod-admin-full=y
+CONFIG_PACKAGE_luci-mod-status=y
+CONFIG_PACKAGE_luci-mod-system=y
 CONFIG_PACKAGE_luci-i18n-zh-cn=y
 CONFIG_PACKAGE_luci-theme-argon=y
 CONFIG_PACKAGE_luci-app-argon-config=y
 
-# 网络加速 核心
+# ======================== 网络加速核心 ========================
 CONFIG_PACKAGE_kmod-tcp-bbr=y
 CONFIG_PACKAGE_irqbalance=y
 CONFIG_FIREWALL_OFFLOADING=y
 CONFIG_PACKAGE_sqm-scripts=y
 CONFIG_PACKAGE_luci-app-sqm=y
+CONFIG_PACKAGE_kmod-sched-cake=y
+CONFIG_PACKAGE_kmod-sched-ctinfo=y
 
-# 多WAN 负载均衡
+# ======================== 多WAN负载均衡 ========================
 CONFIG_PACKAGE_mwan3=y
 CONFIG_PACKAGE_luci-app-mwan3=y
 CONFIG_PACKAGE_luci-app-mwan3helper=y
 
-# 校园网防检测 全套（你指定需求）
+# ======================== 校园网防检测全套 ========================
 CONFIG_PACKAGE_ua3f=y
 CONFIG_PACKAGE_kmod-rkp-ipid=y
 CONFIG_PACKAGE_kmod-iptables-iport=y
@@ -34,38 +43,86 @@ CONFIG_PACKAGE_kmod-ipt-ipopt=y
 CONFIG_PACKAGE_iptables-mod-ipopt=y
 CONFIG_PACKAGE_kmod-ipt-filter=y
 CONFIG_PACKAGE_iptables-mod-filter=y
+CONFIG_PACKAGE_kmod-ipt-raw=y
+CONFIG_PACKAGE_iptables-mod-raw=y
 
-# 代理 & Clash
+# ======================== 代理 & Clash ========================
 CONFIG_PACKAGE_luci-app-openclash=y
 CONFIG_PACKAGE_clash-core=y
+# CONFIG_PACKAGE_clash is not set
 
-# DNS 加密 DoH & 广告屏蔽
+# ======================== DNS 加密 & 广告屏蔽 ========================
 CONFIG_PACKAGE_dnsmasq-full=y
+# CONFIG_PACKAGE_dnsmasq is not set
+CONFIG_PACKAGE_dnsmasq_full_dhcpv6=y
+CONFIG_PACKAGE_dnsmasq_full_ipset=y
+CONFIG_PACKAGE_dnsmasq_full_nftset=y
 CONFIG_PACKAGE_https-dns-proxy=y
-CONFIG_PACKAGE_dns-over-https=y
+# CONFIG_PACKAGE_dns-over-https is not set  # 避免冲突
 CONFIG_PACKAGE_luci-app-adguardhome=y
 CONFIG_PACKAGE_luci-app-smartdns=y
+CONFIG_PACKAGE_smartdns=y
 
-# 带宽监控 / 流量统计
+# ======================== 带宽监控 / 流量统计 ========================
 CONFIG_PACKAGE_luci-app-nlbwmon=y
+CONFIG_PACKAGE_nlbwmon=y
 CONFIG_PACKAGE_luci-app-statistics=y
+CONFIG_PACKAGE_collectd=y
+CONFIG_PACKAGE_collectd-mod-cpu=y
+CONFIG_PACKAGE_collectd-mod-interface=y
+CONFIG_PACKAGE_collectd-mod-iwinfo=y
+CONFIG_PACKAGE_collectd-mod-load=y
+CONFIG_PACKAGE_collectd-mod-memory=y
+CONFIG_PACKAGE_collectd-mod-network=y
+CONFIG_PACKAGE_collectd-mod-rrdtool=y
 CONFIG_PACKAGE_htop=y
 CONFIG_PACKAGE_iftop=y
+CONFIG_PACKAGE_nethogs=y
+CONFIG_PACKAGE_iperf3=y
 
-# VPN 套件
+# ======================== VPN 套件 ========================
 CONFIG_PACKAGE_luci-app-wireguard=y
 CONFIG_PACKAGE_wireguard-tools=y
+CONFIG_PACKAGE_kmod-wireguard=y
 CONFIG_PACKAGE_luci-app-openvpn=y
+CONFIG_PACKAGE_openvpn-openssl=y
+CONFIG_PACKAGE_kmod-tun=y
 
-# 实用工具
+# ======================== 实用工具 ========================
 CONFIG_PACKAGE_ttyd=y
 CONFIG_PACKAGE_luci-app-ttyd=y
 CONFIG_PACKAGE_luci-app-ddns=y
+CONFIG_PACKAGE_ddns-scripts=y
+CONFIG_PACKAGE_ddns-scripts-cloudflare=y
 CONFIG_PACKAGE_miniupnpd=y
 CONFIG_PACKAGE_luci-app-upnp=y
 CONFIG_PACKAGE_watchcat=y
+CONFIG_PACKAGE_luci-app-watchcat=y
+CONFIG_PACKAGE_curl=y
+CONFIG_PACKAGE_wget=y
+CONFIG_PACKAGE_wget-ssl=y
+CONFIG_PACKAGE_vim-fuller=y
+CONFIG_PACKAGE_nano=y
+CONFIG_PACKAGE_tree=y
+CONFIG_PACKAGE_lsof=y
+CONFIG_PACKAGE_strace=y
+CONFIG_PACKAGE_tcpdump=y
+CONFIG_PACKAGE_bind-dig=y
+CONFIG_PACKAGE_bind-host=y
 
-# 无线 WiFi6 驱动优化
+# ======================== 无线 WiFi6 驱动优化 ========================
 CONFIG_PACKAGE_kmod-mt7915e=y
-CONFIG_PACKAGE_kmod-mt7916e=y
+# CONFIG_PACKAGE_kmod-mt7916e is not set  # CR6606 不适用
+CONFIG_PACKAGE_kmod-mt76-connac=y
+CONFIG_PACKAGE_kmod-mt76-core=y
 CONFIG_WIFI_COUNTRY_CN=y
+CONFIG_PACKAGE_wpad-openssl=y
+# CONFIG_PACKAGE_wpad-basic-mbedtls is not set
+CONFIG_PACKAGE_hostapd-common=y
+
+# ======================== 其他优化 ========================
+CONFIG_BUILD_PATENTED=y
+CONFIG_KERNEL_CGROUP_V2=y
+CONFIG_PACKAGE_cgroupfs-mount=y
+CONFIG_PACKAGE_zram-swap=y
+CONFIG_PACKAGE_luci-app-zram=y
