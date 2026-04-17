@@ -13,3 +13,6 @@ echo "net.ipv4.tcp_tw_reuse=1" >> package/base-files/files/etc/sysctl.conf
 echo "net.ipv4.tcp_window_scaling=1" >> package/base-files/files/etc/sysctl.conf
 echo "net.core.default_qdisc=fq" >> package/base-files/files/etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control=bbr" >> package/base-files/files/etc/sysctl.conf
+
+#添加多wan自动登录
+echo "CONFIG_PACKAGE_luci-app-multi-login=y" >> .config
