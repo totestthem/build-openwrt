@@ -1,14 +1,18 @@
 #!/bin/bash
-#========================================================================================================================
-# https://github.com/ophub/amlogic-s9xxx-openwrt
-# Description: Automatically Build OpenWrt
-# Function: Diy script (Before Update feeds, Modify the default IP, hostname, theme, add/remove software packages, etc.)
-# Source code repository: https://github.com/immortalwrt/immortalwrt / Branch: master
-#========================================================================================================================
+cd openwrt
 
-# Add a feed source
-# sed -i '$a src-git lienol https://github.com/Lienol/openwrt-package' feeds.conf.default
+# 多WAN自动登录
+git clone https://github.com/Zesuy/luci-app-multi-login package/luci-app-multi-login
 
-# other
-# rm -rf package/emortal/{autosamba,ipv6-helper}
+# OpenClash
+git clone https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 
+# UA3F
+git clone https://github.com/monsunpass/ua3f package/ua3f
+
+# RKP-IPID 防检测
+git clone https://github.com/EOIwork/rkp-ipid package/rkp-ipid
+
+# Argon 主题
+git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+git clone https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
