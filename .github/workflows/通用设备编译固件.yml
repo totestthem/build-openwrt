@@ -17,31 +17,37 @@ jobs:
         run: |
           git clone https://github.com/immortalwrt/immortalwrt.git --depth=1 openwrt
 
-      - name: 添加自定义插件源
+      - name: 执行DIY Part1（克隆插件）
         run: |
           cd openwrt
           chmod +x ../config/immortalwrt-master/diy-part1.sh
           ../config/immortalwrt-master/diy-part1.sh
 
-      - name: 更新软件源
+      - name: 更新并安装所有软件源（自动解决依赖警告）
         run: |
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          # 安装缺失的基础依赖（彻底消除WARNING）
+          ./scripts/feeds install luci luci-base bash curl luci-compat mwan3
 
-      - name: 加载设备与插件配置
+      - name: 加载基础配置
         run: |
           cd openwrt
           cp ../config/immortalwrt-master/config .config
-          make defconfig
 
-      - name: 自定义系统优化
+      - name: 执行DIY Part2（启用插件+修改设置）
         run: |
           cd openwrt
           chmod +x ../config/immortalwrt-master/diy-part2.sh
           ../config/immortalwrt-master/diy-part2.sh
 
-      - name: 下载所有依赖
+      - name: 应用所有配置（最后执行！）
+        run: |
+          cd openwrt
+          make defconfig
+
+      - name: 下载所有编译依赖
         run: |
           cd openwrt
           make download -j$(nproc)
