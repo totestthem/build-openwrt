@@ -6,7 +6,7 @@
 git clone https://github.com/Zesuy/luci-app-multi-login package/luci-app-multi-login
 
 # OpenClash
-git clone https://github.com/vernesong/OpenClash.git package/luci-app-openclash
+#git clone https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 
 # UA3F
 git clone https://github.com/SunBK201/ua3f package/ua3f
@@ -17,3 +17,6 @@ git clone https://github.com/CHN-beta/rkp-ipid package/rkp-ipid
 # Argon 主题 + 配置
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 git clone https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
+
+#turboacc
+git clone https://github.com/imapproxy/luci-app-turboacc package/luci-app-turboacc
