@@ -42,10 +42,11 @@ jobs:
           chmod +x ../config/immortalwrt-master/diy-part2.sh
           ../config/immortalwrt-master/diy-part2.sh
 
+      # 👇👇👇 仅修改这一行！强制指定 CR6606 设备，永不失效
       - name: 应用所有配置（最后执行！）
         run: |
           cd openwrt
-          make defconfig
+          make defconfig TARGET_PROFILE=xiaomi_mi-router-cr6606
 
       - name: 下载所有编译依赖
         run: |
@@ -58,7 +59,7 @@ jobs:
           make -j$(nproc) || make -j1 V=s
 
       - name: 上传固件
-        uses: actions/upload-artifact@v4
+        uses: upload-artifact@v4
         with:
           name: OpenWrt-CR6606
           path: openwrt/bin/targets/ramips/mt7621/*
