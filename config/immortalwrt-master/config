@@ -5,7 +5,7 @@ CONFIG_LINUX_5_15=y
 CONFIG_LUCI_LANG_zh_Hans=y
 
 # 必装核心插件
-CONFIG_PACKAGE_luci-app-openclash=y
+#CONFIG_PACKAGE_luci-app-openclash=y
 CONFIG_PACKAGE_luci-app-multi-login=y
 CONFIG_PACKAGE_ua3f=y
 CONFIG_PACKAGE_rkp-ipid=y
