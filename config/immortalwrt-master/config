@@ -32,8 +32,8 @@ CONFIG_PACKAGE_kmod-sched-cake=y
 
 # DNS & DOH 加密
 CONFIG_PACKAGE_dnsmasq-full=y
-CONFIG_PACKAGE_https-dns-proxy=y
-CONFIG_PACKAGE_luci-app-dnsfilter=y
+# CONFIG_PACKAGE_https-dns-proxy=y
+# CONFIG_PACKAGE_luci-app-dnsfilter=y
 
 # 移除全部额外VPN 全家桶
 # CONFIG_PACKAGE_luci-app-wireguard=n
