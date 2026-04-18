@@ -41,7 +41,7 @@ CONFIG_PACKAGE_luci-app-dnsfilter=y
 # CONFIG_PACKAGE_luci-app-ipsec-server=n
 
 # 带宽监控 只保留 nlbwmon，删掉重复
-CONFIG_PACKAGE_luci-app-nlbwmon=y
+# CONFIG_PACKAGE_luci-app-nlbwmon=y
 # CONFIG_PACKAGE_luci-app-wrtbwmon=n
 
 # 系统工具
@@ -61,9 +61,13 @@ CONFIG_PACKAGE_kmod-mt7915e=y
 CONFIG_PACKAGE_wpad-openssl=y
 
 # 额外瘦身关键（自动关闭多余语言/调试）
-CONFIG_LUCI_LANG_all=n
 CONFIG_DEBUG=n
+CONFIG_DEBUG_INFO=n
 CONFIG_KERNEL_DEBUG=n
+CONFIG_KERNEL_DEBUG_INFO=n
+CONFIG_COMPILE_DEBUG=n
+CONFIG_LUCI_LANG_all=n
+CONFIG_LUCI_LANG_en=n
 
 # Squashfs 最高压缩率（xz）
 CONFIG_TARGET_ROOTFS_SQUASHFS=y
