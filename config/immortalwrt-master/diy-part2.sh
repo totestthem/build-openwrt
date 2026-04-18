@@ -20,4 +20,4 @@ echo "CONFIG_PACKAGE_luci-app-multi-login=y" >> .config
 echo "CONFIG_PACKAGE_ua3f=y" >> .config
 echo "CONFIG_PACKAGE_rkp-ipid=y" >> .config
 
-echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
+#echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
