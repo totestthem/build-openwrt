@@ -19,4 +19,4 @@ git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-a
 git clone https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
 
 #turboacc
-git clone https://github.com/imapproxy/luci-app-turboacc package/luci-app-turboacc
+#git clone https://github.com/imapproxy/luci-app-turboacc package/luci-app-turboacc
