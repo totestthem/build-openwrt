@@ -15,9 +15,9 @@ echo "net.core.default_qdisc=fq" >> package/base-files/files/etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control=bbr" >> package/base-files/files/etc/sysctl.conf
 
 #添加多wan自动登录
-echo "CONFIG_PACKAGE_luci-app-multi-login=y" >> .config
+#echo "CONFIG_PACKAGE_luci-app-multi-login=y" >> .config
 #echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
-echo "CONFIG_PACKAGE_ua3f=y" >> .config
-echo "CONFIG_PACKAGE_rkp-ipid=y" >> .config
+#echo "CONFIG_PACKAGE_ua3f=y" >> .config
+#echo "CONFIG_PACKAGE_rkp-ipid=y" >> .config
 
 #echo "CONFIG_PACKAGE_luci-app-turboacc=y" >> .config
