@@ -6,10 +6,10 @@
 git clone https://github.com/Zesuy/luci-app-multi-login package/luci-app-multi-login
 
 # OpenClash
-#git clone https://github.com/vernesong/OpenClash.git package/luci-app-openclash
+git clone https://github.com/vernesong/OpenClash.git package/luci-app-openclash
 
 # UA3F
-git clone https://github.com/SunBK201/ua3f package/ua3f
+#git clone https://github.com/SunBK201/ua3f package/ua3f
 
 # RKP-IPID 防检测
 git clone https://github.com/CHN-beta/rkp-ipid package/rkp-ipid
