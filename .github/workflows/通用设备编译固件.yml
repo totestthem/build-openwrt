@@ -23,7 +23,6 @@ on:
         description: "指定版本 (Tag/Commit, 留空则拉取最新)"
         required: false
         default: ""
-      # 你可以在这里继续添加其他输入，比如是否上传 Release 等
       upload_release:
         description: "是否发布到 Releases"
         required: false
@@ -31,7 +30,6 @@ on:
         type: boolean
 
 env:
-  # 根据选择的分支自动匹配配置文件路径
   FEEDS_CONF: config/${{ inputs.source_branch }}/feeds.conf.default
   CONFIG_FILE: config/${{ inputs.source_branch }}/config
   DIY_P1_SH: config/${{ inputs.source_branch }}/diy-part1.sh
@@ -44,12 +42,26 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    # 只有仓库所有者自己触发才运行，防止别人乱用你的 Actions 额度
     if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
 
     steps:
       - name: 检出当前仓库代码 (Checkout)
         uses: actions/checkout@v4
+
+      # ==============================================
+      # 🔴 这里是我新加的：最大化 GitHub Actions 磁盘空间
+      # ==============================================
+      - name: 最大化构建磁盘空间 (Fix Disk Full)
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-rust: 'true'
+          remove-nodejs: 'true'
+          remove-phantomjs: 'true'
 
       - name: 初始化编译环境 (Initialization)
         id: init
@@ -64,7 +76,6 @@ jobs:
           echo "正在安装依赖..."
           sudo -E apt-get -qq update
           sudo -E apt-get -qq purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
-          # 使用 ImmortalWrt 推荐的依赖安装方式 (更全)
           sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gnutls-dev gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
           
           sudo -E systemctl daemon-reload
@@ -84,7 +95,6 @@ jobs:
         working-directory: /workdir
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
-          # 1. 映射源码仓库地址
           if [[ "${{ inputs.source_branch }}" == *"openwrt"* ]]; then
               REPO_URL="https://github.com/openwrt/openwrt"
               REPO_BRANCH="main"
@@ -109,15 +119,12 @@ jobs:
           echo "REPO_URL: ${REPO_URL}"
           echo "REPO_BRANCH: ${REPO_BRANCH}"
 
-          # 2. 克隆源码 (浅克隆)
-          echo "正在克隆源码 (浅克隆)..."
           git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
           cd openwrt
 
-          # 3. 如果指定了版本，则切换到指定 Tag/Commit
           if [[ -n "${{ inputs.source_version }}" ]]; then
               echo "正在切换到指定版本: ${{ inputs.source_version }}"
-              git fetch --unshallow --tags # 获取完整历史和标签
+              git fetch --unshallow --tags
               git checkout ${{ inputs.source_version }}
               if [ $? -ne 0 ]; then
                   echo "错误：切换版本失败，请检查 Tag/Commit 是否正确。"
@@ -125,11 +132,9 @@ jobs:
               fi
           fi
           
-          # 显示当前 HEAD 版本
           CURRENT_HASH=$(git rev-parse --short HEAD)
           echo "当前源码版本 Hash: ${CURRENT_HASH}"
 
-          # 4. 建立软链接
           cd /workdir
           ln -sf /workdir/openwrt ${GITHUB_WORKSPACE}/openwrt
           
@@ -138,10 +143,8 @@ jobs:
 
       - name: 加载自定义软件源配置 (Load Feeds & DIY Part 1)
         run: |
-          # 如果有自定义的 feeds.conf 则替换
           [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
           
-          # 执行 DIY 脚本第一部分 (通常用于修改 feeds)
           if [[ -f "${DIY_P1_SH}" ]]; then
             chmod +x ${DIY_P1_SH}
             cd openwrt/
@@ -159,10 +162,8 @@ jobs:
 
       - name: 加载固件配置 (Load Config & DIY Part 2)
         run: |
-          # 如果有自定义 files 文件夹 (内含固件文件系统覆盖)
           [[ -d "files" ]] && mv -f files openwrt/files
           
-          # 复制 .config 文件
           if [[ -e "${CONFIG_FILE}" ]]; then
             cp -f ${CONFIG_FILE} openwrt/.config
           else
@@ -170,7 +171,6 @@ jobs:
             exit 1
           fi
           
-          # 执行 DIY 脚本第二部分 (通常用于修改配置、打补丁)
           if [[ -f "${DIY_P2_SH}" ]]; then
             chmod +x ${DIY_P2_SH}
             cd openwrt/
@@ -194,10 +194,8 @@ jobs:
         run: |
           cd openwrt/
           echo "使用 $(nproc) 线程进行编译..."
-          # 优先多线程，失败则单线程排错
           make -j$(($(nproc) + 1)) V=s || make -j1 || make -j1 V=s
           
-          # 提取设备名称
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
           [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
           echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
@@ -235,7 +233,6 @@ jobs:
         if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
         run: |
           echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> ${GITHUB_OUTPUT}
-          # 生成 Release 说明文本
           touch release.txt
           echo "### OpenWrt 固件信息" >> release.txt
           echo "- 源码来源: ${{ inputs.source_branch }}" >> release.txt
