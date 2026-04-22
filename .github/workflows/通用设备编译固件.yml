@@ -1,70 +1,90 @@
 #============================================================================================
 # https://github.com/ophub/amlogic-s9xxx-openwrt
-# Description: Build OpenWrt
+# Description: Build OpenWrt (Modified & Fixed Version)
 #============================================================================================
 
-name: 通用设备编译固件
+name: 通用设备编译固件 (修正版)
 
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
       source_branch:
-        description: "Select the source branch"
+        description: "选择源码仓库"
         required: false
-        default: "openwrt-main"
+        default: "immortalwrt-master"
         type: choice
         options:
           - openwrt-main
           - lede-master
           - immortalwrt-master
           - Lienol-master
-      
+      source_version:
+        description: "指定版本 (Tag/Commit, 留空则拉取最新)"
+        required: false
+        default: ""
+      # 你可以在这里继续添加其他输入，比如是否上传 Release 等
+      upload_release:
+        description: "是否发布到 Releases"
+        required: false
+        default: "true"
+        type: boolean
+
 env:
+  # 根据选择的分支自动匹配配置文件路径
   FEEDS_CONF: config/${{ inputs.source_branch }}/feeds.conf.default
   CONFIG_FILE: config/${{ inputs.source_branch }}/config
   DIY_P1_SH: config/${{ inputs.source_branch }}/diy-part1.sh
   DIY_P2_SH: config/${{ inputs.source_branch }}/diy-part2.sh
-  UPLOAD_BIN_DIR: true
+  UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
+  UPLOAD_RELEASE: ${{ inputs.upload_release }}
   TZ: Asia/Shanghai
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    # 只有仓库所有者自己触发才运行，防止别人乱用你的 Actions 额度
     if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
+      - name: 检出当前仓库代码 (Checkout)
+        uses: actions/checkout@v4
 
-      - name: Initialization environment
+      - name: 初始化编译环境 (Initialization)
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          docker rmi `docker images -q`
+          echo "正在清理磁盘空间..."
+          docker rmi `docker images -q` 2>/dev/null || true
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
-          sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android 2>/dev/null
-          sudo -E apt-get -y update
-          sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
-          sudo -E apt-get -y install $(curl -fsSL https://is.gd/depend_ubuntu2204_openwrt)
+          sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android 2>/dev/null || true
+          
+          echo "正在安装依赖..."
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
+          # 使用 ImmortalWrt 推荐的依赖安装方式 (更全)
+          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gnutls-dev gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+          
           sudo -E systemctl daemon-reload
-          #sudo -E apt-get -y full-upgrade
-          sudo -E apt-get -y autoremove --purge
-          sudo -E apt-get clean
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          
+          echo "正在配置工作目录..."
           sudo mkdir -p /workdir
           sudo chown ${USER}:${GROUPS} /workdir
           sudo timedatectl set-timezone "${TZ}"
+          
           echo "status=success" >> ${GITHUB_OUTPUT}
+          df -hT
 
-      - name: Clone source code [ ${{ inputs.source_branch }} ]
+      - name: 克隆 OpenWrt 源码 (Clone Source Code)
         id: codes
         working-directory: /workdir
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
-          # Set up compilation source code
+          # 1. 映射源码仓库地址
           if [[ "${{ inputs.source_branch }}" == *"openwrt"* ]]; then
               REPO_URL="https://github.com/openwrt/openwrt"
               REPO_BRANCH="main"
@@ -79,45 +99,88 @@ jobs:
               TAGS_NAME="immortalwrt"
           elif [[ "${{ inputs.source_branch }}" == *"Lienol"* ]]; then
               REPO_URL="https://github.com/Lienol/openwrt"
-              REPO_BRANCH="22.03"
+              REPO_BRANCH="master"
               TAGS_NAME="Lienol"
           else
               echo "Unknown source code repository."
               exit 1
           fi
 
-          # Clone source code
+          echo "REPO_URL: ${REPO_URL}"
+          echo "REPO_BRANCH: ${REPO_BRANCH}"
+
+          # 2. 克隆源码 (浅克隆)
+          echo "正在克隆源码 (浅克隆)..."
           git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
+          cd openwrt
+
+          # 3. 如果指定了版本，则切换到指定 Tag/Commit
+          if [[ -n "${{ inputs.source_version }}" ]]; then
+              echo "正在切换到指定版本: ${{ inputs.source_version }}"
+              git fetch --unshallow --tags # 获取完整历史和标签
+              git checkout ${{ inputs.source_version }}
+              if [ $? -ne 0 ]; then
+                  echo "错误：切换版本失败，请检查 Tag/Commit 是否正确。"
+                  exit 1
+              fi
+          fi
+          
+          # 显示当前 HEAD 版本
+          CURRENT_HASH=$(git rev-parse --short HEAD)
+          echo "当前源码版本 Hash: ${CURRENT_HASH}"
+
+          # 4. 建立软链接
+          cd /workdir
           ln -sf /workdir/openwrt ${GITHUB_WORKSPACE}/openwrt
-
-          # Set output information
-          echo "build_tag=OpenWrt_${TAGS_NAME}_${{ inputs.openwrt_storage }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
-          echo -e "REPO_URL: [ ${REPO_URL} ]\nREPO_BRANCH: [ ${REPO_BRANCH} ]\nTAGS_NAME: [ ${TAGS_NAME} ]"
-          df -hT ${PWD}
+          
           echo "status=success" >> ${GITHUB_OUTPUT}
+          df -hT ${PWD}
 
-      - name: Load custom feeds
+      - name: 加载自定义软件源配置 (Load Feeds & DIY Part 1)
         run: |
+          # 如果有自定义的 feeds.conf 则替换
           [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
-          chmod +x ${DIY_P1_SH}
-          cd openwrt/
-          ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+          
+          # 执行 DIY 脚本第一部分 (通常用于修改 feeds)
+          if [[ -f "${DIY_P1_SH}" ]]; then
+            chmod +x ${DIY_P1_SH}
+            cd openwrt/
+            echo "正在执行 diy-part1.sh..."
+            ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+          else
+            echo "警告: 未找到 diy-part1.sh，跳过此步。"
+          fi
 
-      - name: Update feeds
+      - name: 更新 Feeds (Update Feeds)
         run: cd openwrt/ && ./scripts/feeds update -a
 
-      - name: Install feeds
+      - name: 安装 Feeds (Install Feeds)
         run: cd openwrt/ && ./scripts/feeds install -a
 
-      - name: Load custom configuration
+      - name: 加载固件配置 (Load Config & DIY Part 2)
         run: |
+          # 如果有自定义 files 文件夹 (内含固件文件系统覆盖)
           [[ -d "files" ]] && mv -f files openwrt/files
-          [[ -e "${CONFIG_FILE}" ]] && cp -f ${CONFIG_FILE} openwrt/.config
-          chmod +x ${DIY_P2_SH}
-          cd openwrt/
-          ${GITHUB_WORKSPACE}/${DIY_P2_SH}
+          
+          # 复制 .config 文件
+          if [[ -e "${CONFIG_FILE}" ]]; then
+            cp -f ${CONFIG_FILE} openwrt/.config
+          else
+            echo "错误：未找到 .config 文件 (${CONFIG_FILE})！"
+            exit 1
+          fi
+          
+          # 执行 DIY 脚本第二部分 (通常用于修改配置、打补丁)
+          if [[ -f "${DIY_P2_SH}" ]]; then
+            chmod +x ${DIY_P2_SH}
+            cd openwrt/
+            echo "正在执行 diy-part2.sh..."
+            ${GITHUB_WORKSPACE}/${DIY_P2_SH}
+          else
+            echo "警告: 未找到 diy-part2.sh，跳过此步。"
+          fi
 
-      - name: Download package
+      - name: 下载源码包 (Download Packages)
         id: package
         run: |
           cd openwrt/
@@ -126,54 +189,64 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile the OpenWrt
+      - name: 编译固件 (Compile Firmware)
         id: compile
         run: |
           cd openwrt/
-          echo -e "$(nproc) thread compile"
+          echo "使用 $(nproc) 线程进行编译..."
+          # 优先多线程，失败则单线程排错
           make -j$(($(nproc) + 1)) V=s || make -j1 || make -j1 V=s
+          
+          # 提取设备名称
+          grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+          [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+          echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
           echo "status=success" >> ${GITHUB_OUTPUT}
 
-
-      - name: Check space usage
+      - name: 检查磁盘空间 (Check Space)
         if: (!cancelled())
         run: df -hT
 
-      - name: Upload bin directory
-        uses: actions/upload-artifact@main
+      - name: 上传 Bin 目录 (Upload Bin Directory)
+        uses: actions/upload-artifact@v4
         if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
         with:
           name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
           path: openwrt/bin
 
-      - name: Organize files
+      - name: 整理固件文件 (Organize Files)
         id: organize
         if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
         run: |
           cd openwrt/bin/targets/*/*
           rm -rf packages
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          echo "::set-output name=status::success"
+          echo "status=success" >> ${GITHUB_OUTPUT}
 
-      - name: Upload firmware directory
-        uses: actions/upload-artifact@main
+      - name: 上传固件目录 (Upload Firmware)
+        uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
-          name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+          name: ImmortalWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
           path: ${{ env.FIRMWARE }}
 
-      - name: Generate release tag
+      - name: 生成 Release 标签 (Generate Release Tag)
         id: tag
-        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+        if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
         run: |
-          echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
+          echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> ${GITHUB_OUTPUT}
+          # 生成 Release 说明文本
           touch release.txt
-          [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
-          [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          echo "::set-output name=status::success"
+          echo "### OpenWrt 固件信息" >> release.txt
+          echo "- 源码来源: ${{ inputs.source_branch }}" >> release.txt
+          echo "- 指定版本: ${{ inputs.source_version || 'Latest' }}" >> release.txt
+          echo "- 默认 IP: 192.168.1.1" >> release.txt
+          echo "- 默认用户名: root" >> release.txt
+          echo "- 默认密码: password (或 none)" >> release.txt
+          echo "status=success" >> ${GITHUB_OUTPUT}
 
-      - name: Upload firmware to release
-        uses: softprops/action-gh-release@v1
+      - name: 发布固件到 Releases (Upload to Release)
+        uses: softprops/action-gh-release@v2
         if: steps.tag.outputs.status == 'success' && !cancelled()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -182,22 +255,10 @@ jobs:
           body_path: release.txt
           files: ${{ env.FIRMWARE }}/*
 
-      - name: Delete workflow runs
-        uses: GitRML/delete-workflow-runs@main
+      - name: 清理旧的 Workflow 运行记录 (Delete Old Runs)
+        uses: Mattraks/delete-workflow-runs@v2
         with:
-          retain_days: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 2
           keep_minimum_runs: 3
-          token: ${{ secrets.GH_TOKEN }}
-          body: |
-
-            ### OpenWrt Image information
-            - Default IP: 192.168.1.1
-            - Default username: root
-            - Default password: password
-            - Default WIFI name: OpenWrt
-            - Default WIFI password: none
-            ### Install to EMMC
-            - Login to OpenWrt → System → Amlogic Service → Install OpenWrt
-            ### OpenWrt Image Verification
-            - sha256sum
-    
