@@ -1,64 +1,129 @@
-name: 通用设备编译固件
+name: Build ImmortalWrt 24.10.4 for CR6606
+
 on:
   workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
+
+env:
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_BRANCH: v24.10.4
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: config/immortalwrt-master/config
+  DIY_P1_SH: config/immortalwrt-master/diy-part1.sh
+  DIY_P2_SH: config/immortalwrt-master/diy-part2.sh
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: false
+  TZ: Asia/Shanghai
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: 初始化编译环境
-        run: |
-          sudo apt update
-          sudo apt -y install build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
 
-      - name: 下载 ImmortalWrt 源码
-        run: |
-          git clone https://github.com/immortalwrt/immortalwrt.git --depth=1 openwrt
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-      - name: 执行DIY Part1（克隆插件）
-        run: |
-          cd openwrt
-          chmod +x ../config/immortalwrt-master/diy-part1.sh
-          ../config/immortalwrt-master/diy-part1.sh
+    - name: Load custom feeds
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
 
-      - name: 更新并安装所有软件源（自动解决依赖警告）
-        run: |
-          cd openwrt
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
-          # 安装缺失的基础依赖（彻底消除WARNING）
-          ./scripts/feeds install luci luci-base bash curl luci-compat mwan3
+    - name: Update feeds
+      run: cd openwrt && ./scripts/feeds update -a
 
-      - name: 加载基础配置
-        run: |
-          cd openwrt
-          cp ../config/immortalwrt-master/config .config
+    - name: Install feeds
+      run: cd openwrt && ./scripts/feeds install -a
 
-      - name: 执行DIY Part2（启用插件+修改设置）
-        run: |
-          cd openwrt
-          chmod +x ../config/immortalwrt-master/diy-part2.sh
-          ../config/immortalwrt-master/diy-part2.sh
+    - name: Load custom configuration
+      run: |
+        [ -e files ] && mv files openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
 
-      - name: 应用所有配置（强制指定CR6606设备）
-        run: |
-          cd openwrt
-          make defconfig TARGET_PROFILE=xiaomi_mi-router-cr6606
+    - name: SSH connection to Actions
+      uses: P3TERX/ssh2actions@v1.0.0
+      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
+      env:
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 
-      - name: 下载所有编译依赖
-        run: |
-          cd openwrt
-          make download -j$(nproc)
+    - name: Download package
+      id: package
+      run: |
+        cd openwrt
+        make defconfig
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
 
-      - name: 开始编译固件
-        run: |
-          cd openwrt
-          make -j$(nproc) || make -j1 V=s
+    - name: Compile the firmware
+      id: compile
+      run: |
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-      - name: 上传固件
-        uses: actions/upload-artifact@v4
-        with:
-          name: OpenWrt-CR6606
-          path: openwrt/bin/targets/ramips/mt7621/*
+    - name: Check space usage
+      if: (!cancelled())
+      run: df -hT
+
+    - name: Upload bin directory
+      uses: actions/upload-artifact@v4
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      with:
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: openwrt/bin
+
+    - name: Organize files
+      id: organize
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true'
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload firmware directory
+      uses: actions/upload-artifact@v4
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      with:
+        name: ImmortalWrt_24.10.4_CR6606${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}
+
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        retain_days: 1
+        keep_minimum_runs: 3
