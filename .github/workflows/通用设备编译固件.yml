@@ -45,11 +45,9 @@ jobs:
     if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
 
     steps:
-      - name: 检出当前仓库代码 (Checkout)
-        uses: actions/checkout@v4
-
       # ==============================================
-      # 🔴 这里是我新加的：最大化 GitHub Actions 磁盘空间
+      # ✅ 正确位置：在检出代码之前先扩容磁盘
+      # 这样不会清空你的仓库文件，也能让后续所有目录都享受到扩容
       # ==============================================
       - name: 最大化构建磁盘空间 (Fix Disk Full)
         uses: easimon/maximize-build-space@v10
@@ -62,6 +60,9 @@ jobs:
           remove-rust: 'true'
           remove-nodejs: 'true'
           remove-phantomjs: 'true'
+
+      - name: 检出当前仓库代码 (Checkout)
+        uses: actions/checkout@v4
 
       - name: 初始化编译环境 (Initialization)
         id: init
@@ -166,8 +167,10 @@ jobs:
           
           if [[ -e "${CONFIG_FILE}" ]]; then
             cp -f ${CONFIG_FILE} openwrt/.config
+            echo "成功加载配置文件: ${CONFIG_FILE}"
           else
             echo "错误：未找到 .config 文件 (${CONFIG_FILE})！"
+            echo "请确保你的仓库根目录下存在该文件。"
             exit 1
           fi
           
